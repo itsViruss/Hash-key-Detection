@@ -3,21 +3,24 @@ import hashlib
 import json
 import os
 import shlex
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa, utils
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-DATA_DIR = BASE_DIR / "data"
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+RUNTIME_DIR = Path(tempfile.gettempdir()) / "hash-key-simulator" if IS_VERCEL else BASE_DIR
+UPLOAD_DIR = RUNTIME_DIR / "uploads"
+DATA_DIR = RUNTIME_DIR / "data"
 LOG_FILE = DATA_DIR / "logs.json"
 COLLISION_DIR = BASE_DIR / "demo_collisions"
 
@@ -46,7 +49,12 @@ LAB_SESSIONS = {}
 PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 PUBLIC_KEY = PRIVATE_KEY.public_key()
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder=str(BASE_DIR / "public"),
+    template_folder=str(BASE_DIR / "templates"),
+    static_url_path="",
+)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 
@@ -113,6 +121,90 @@ def verify_digest_signature(digest: bytes, signature: bytes, algorithm: str) -> 
         return True
     except InvalidSignature:
         return False
+
+
+def export_public_key_pem() -> str:
+    return PUBLIC_KEY.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+
+
+def verify_digest_signature_with_key(digest: bytes, signature: bytes, algorithm: str, public_key_pem: str) -> bool:
+    if not public_key_pem:
+        return False
+
+    public_key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
+    try:
+        public_key.verify(
+            signature,
+            digest,
+            padding.PKCS1v15(),
+            utils.Prehashed(PREHASH_ALGORITHMS[algorithm]),
+        )
+        return True
+    except InvalidSignature:
+        return False
+
+
+def _encode_bytes(value: bytes | None) -> str | None:
+    if value is None:
+        return None
+    return base64.b64encode(value).decode("ascii")
+
+
+def _decode_bytes(value: str | None) -> bytes | None:
+    if value is None:
+        return None
+    return base64.b64decode(value.encode("ascii"))
+
+
+def encode_lab_session(session: dict) -> str:
+    payload = {
+        "id": session["id"],
+        "filename": session["filename"],
+        "algorithm": session["algorithm"],
+        "enable_signature": session["enable_signature"],
+        "original_bytes": _encode_bytes(session["original_bytes"]),
+        "current_bytes": _encode_bytes(session["current_bytes"]),
+        "sender_digest": _encode_bytes(session["sender_digest"]),
+        "sender_hash": session["sender_hash"],
+        "signature": _encode_bytes(session.get("signature")),
+        "public_key_pem": session.get("public_key_pem", ""),
+        "stage": session["stage"],
+        "file_sent": session["file_sent"],
+        "history": session["history"],
+        "learning_message": session["learning_message"],
+        "progress": session["progress"],
+        "verification": session.get("verification"),
+    }
+    return base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
+
+
+def restore_lab_session(session_blob: str) -> dict:
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(session_blob.encode("ascii")).decode("utf-8"))
+    except (ValueError, json.JSONDecodeError) as error:
+        raise ValueError("Lab session expired. Reload the file with 'load file' and try again.") from error
+
+    return {
+        "id": payload["id"],
+        "filename": payload["filename"],
+        "algorithm": payload["algorithm"],
+        "enable_signature": payload["enable_signature"],
+        "original_bytes": _decode_bytes(payload["original_bytes"]) or b"",
+        "current_bytes": _decode_bytes(payload["current_bytes"]) or b"",
+        "sender_digest": _decode_bytes(payload["sender_digest"]) or b"",
+        "sender_hash": payload["sender_hash"],
+        "signature": _decode_bytes(payload.get("signature")),
+        "public_key_pem": payload.get("public_key_pem", ""),
+        "stage": payload["stage"],
+        "file_sent": payload["file_sent"],
+        "history": payload.get("history", []),
+        "learning_message": payload.get("learning_message", ""),
+        "progress": payload.get("progress", {}),
+        "verification": payload.get("verification"),
+    }
 
 
 def append_log(entry: dict) -> None:
@@ -204,14 +296,24 @@ def run_transfer(
         raise ValueError("Unsupported hash algorithm selected.")
 
     original_bytes = uploaded_file.read()
-    sender_file = save_bytes(uploaded_file.filename, original_bytes, "sender")
-
     sender_digest, sender_hash = compute_digest(original_bytes, algorithm)
     signature = sign_digest(sender_digest, algorithm) if enable_signature else None
 
     receiver_bytes, encryption_summary = simulate_encryption(original_bytes, encrypt_file)
-    receiver_file = save_bytes(uploaded_file.filename, receiver_bytes, "receiver")
     receiver_digest, receiver_hash = compute_digest(receiver_bytes, algorithm)
+
+    sender_file = ""
+    receiver_file = ""
+    download_url = ""
+    download_payload_b64 = ""
+    download_name = secure_filename(uploaded_file.filename) or "received_file.bin"
+
+    if IS_VERCEL:
+        download_payload_b64 = base64.b64encode(receiver_bytes).decode("ascii")
+    else:
+        sender_file = save_bytes(uploaded_file.filename, original_bytes, "sender")
+        receiver_file = save_bytes(uploaded_file.filename, receiver_bytes, "receiver")
+        download_url = url_for("download_file", stored_name=receiver_file)
 
     safe = sender_hash == receiver_hash
     signature_valid = None
@@ -258,7 +360,9 @@ def run_transfer(
         "receiver_preview": build_preview(receiver_bytes),
         "sender_file": sender_file,
         "receiver_file": receiver_file,
-        "download_url": url_for("download_file", stored_name=receiver_file),
+        "download_url": download_url,
+        "download_name": download_name,
+        "download_payload_b64": download_payload_b64,
         "recipient_email": recipient,
         "delivery_message": f"Sending to {recipient}... File delivered successfully.",
         "share_message": "Share this hash with receiver to verify file integrity.",
@@ -290,6 +394,7 @@ def create_lab_session(*, uploaded_file, algorithm: str, enable_signature: bool)
         "sender_digest": sender_digest,
         "sender_hash": sender_hash,
         "signature": signature,
+        "public_key_pem": export_public_key_pem(),
         "stage": "sender",
         "file_sent": False,
         "history": [],
@@ -317,14 +422,18 @@ def append_lab_history(session: dict, command: str, output: str, kind: str = "in
     session["history"] = session["history"][-24:]
 
 
-def get_lab_session(session_id: str) -> dict:
-    if not session_id:
-        raise ValueError("Run 'load file' first to create a lab session.")
+def get_lab_session(session_id: str, session_blob: str = "") -> dict:
+    if session_id:
+        session = LAB_SESSIONS.get(session_id)
+        if session is not None:
+            return session
 
-    session = LAB_SESSIONS.get(session_id)
-    if session is None:
-        raise ValueError("Lab session not found. Reload the file with 'load file' and try again.")
-    return session
+    if session_blob:
+        session = restore_lab_session(session_blob)
+        LAB_SESSIONS[session["id"]] = session
+        return session
+
+    raise ValueError("Run 'load file' first to create a lab session.")
 
 
 def set_lab_learning_message(session: dict, message: str) -> None:
@@ -356,6 +465,7 @@ def serialize_lab_session(session: dict, *, last_output: str = "") -> dict:
         "sender_size": len(session["original_bytes"]),
         "current_size": len(session["current_bytes"]),
         "current_digest_b64": base64.b64encode(current_digest).decode("ascii"),
+        "session_blob": encode_lab_session(session),
     }
 
 
@@ -363,6 +473,7 @@ def execute_lab_command(
     *,
     command: str,
     session_id: str,
+    session_blob: str,
     uploaded_file,
     algorithm: str,
     enable_signature: bool,
@@ -396,7 +507,7 @@ def execute_lab_command(
             LAB_SESSIONS[session["id"]] = session
             return serialize_lab_session(session, last_output=output)
 
-        session = get_lab_session(session_id)
+        session = get_lab_session(session_id, session_blob)
 
         if normalized == ["show", "content"]:
             session["progress"]["inspected"] = True
@@ -509,7 +620,12 @@ def execute_lab_command(
             safe = receiver_hash == session["sender_hash"]
             signature_valid = None
             if session["enable_signature"] and session["signature"] is not None:
-                signature_valid = verify_digest_signature(receiver_digest, session["signature"], session["algorithm"])
+                signature_valid = verify_digest_signature_with_key(
+                    receiver_digest,
+                    session["signature"],
+                    session["algorithm"],
+                    session.get("public_key_pem", ""),
+                )
             status = "File Safe" if safe else "File Tampered"
             output = (
                 f"Verification complete. Receiver hash: {receiver_hash}. Result: {status}. "
@@ -624,6 +740,7 @@ def upload_check_alias():
 def simulation_terminal():
     command = request.form.get("command") or ""
     session_id = request.form.get("session_id") or ""
+    session_blob = request.form.get("session_blob") or ""
     algorithm = (request.form.get("algorithm") or "sha256").lower()
     enable_signature = (request.form.get("enable_signature") or "").lower() == "true"
     uploaded_file = request.files.get("file")
@@ -632,6 +749,7 @@ def simulation_terminal():
         result = execute_lab_command(
             command=command,
             session_id=session_id,
+            session_blob=session_blob,
             uploaded_file=uploaded_file,
             algorithm=algorithm,
             enable_signature=enable_signature,
@@ -653,6 +771,7 @@ def simulation_check_compat():
         result = execute_lab_command(
             command=command,
             session_id="",
+            session_blob="",
             uploaded_file=uploaded_file,
             algorithm=algorithm,
             enable_signature=enable_signature,

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Hash Key Detection Simulator{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body data-page="{% block page_id %}{% endblock %}" data-theme="dark">
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="{{ url_for('hash_page') }}">
+        <span class="brand-mark">HK</span>
+        <span>
+          <strong>Hash Key Detection Simulator</strong>
+          <small>Interactive Cybersecurity Learning Platform</small>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <nav class="navbar">
+          <a class="nav-link {% if active_page == 'hash' %}active{% endif %}" href="{{ url_for('hash_page') }}">Hash Tool</a>
+          <a class="nav-link {% if active_page == 'transfer' %}active{% endif %}" href="{{ url_for('transfer_page') }}">Secure Transfer</a>
+          <a class="nav-link {% if active_page == 'simulation' %}active{% endif %}" href="{{ url_for('simulation_page') }}">Simulation Lab</a>
+          <a class="nav-link {% if active_page == 'logs' %}active{% endif %}" href="{{ url_for('logs_page') }}">Activity Logs</a>
+        </nav>
+
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+          <span id="theme-toggle-icon" class="theme-toggle-icon">🌙</span>
+          <span id="theme-toggle-label">Dark Mode</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="page-wrap">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

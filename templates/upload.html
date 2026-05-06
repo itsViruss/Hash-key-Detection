@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Upload | Hash Key Detection Simulator{% endblock %}
+{% block page_id %}upload{% endblock %}
+
+{% block content %}
+  <section class="hero hero-compact">
+    <div>
+      <p class="eyebrow">Real Mode</p>
+      <h1>Upload and Verify File Integrity</h1>
+      <p class="hero-text">
+        This page represents a clean sender-to-receiver transfer with no attacker modification allowed.
+        Every run here is stored in the activity log.
+      </p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <div class="card-heading">
+        <h2>Upload File</h2>
+        <p>Select a file, choose the hashing algorithm, and optionally enable a digital signature.</p>
+      </div>
+
+      <form id="upload-form" class="transfer-form" data-endpoint="/api/upload-check">
+        <label class="field">
+          <span>Upload File</span>
+          <input name="file" type="file" required>
+        </label>
+
+        <label class="field">
+          <span>Hash Algorithm</span>
+          <select name="algorithm">
+            <option value="md5">MD5</option>
+            <option value="sha1">SHA-1</option>
+            <option value="sha256" selected>SHA-256</option>
+          </select>
+        </label>
+
+        <label class="toggle">
+          <input class="signature-toggle" name="enable_signature" type="checkbox" value="true">
+          <span>Enable Digital Signature</span>
+        </label>
+
+        <button class="primary-btn" type="submit">Verify Transfer</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <div class="card-heading">
+        <h2>Sender to Receiver</h2>
+        <p>The receiver recalculates the hash and compares it to the sender's original value.</p>
+      </div>
+
+      <div class="transfer-visual transfer-visual-simple">
+        <div class="node sender active">
+          <h3>Sender</h3>
+          <p>Creates the original hash and optional digital signature.</p>
+        </div>
+        <div class="arrow-line"></div>
+        <div class="node receiver active">
+          <h3>Receiver</h3>
+          <p>Receives the same file and verifies the hash integrity.</p>
+        </div>
+      </div>
+
+      <p class="helper-note">
+        Real Mode disables attacker modification to demonstrate standard integrity verification.
+      </p>
+    </article>
+  </section>
+
+  <section class="card result-panel" id="upload-results">
+    <div class="card-heading">
+      <h2>Verification Results</h2>
+      <p>Hash values and signature output for the sender and receiver.</p>
+    </div>
+
+    <div class="status-row">
+      <div id="upload-status" class="status-pill neutral">Awaiting upload</div>
+      <span class="result-meta" id="upload-algorithm">Algorithm: -</span>
+    </div>
+
+    <div class="result-grid">
+      <div class="result-box">
+        <span class="label">Sender Hash</span>
+        <code id="upload-sender-hash">-</code>
+      </div>
+      <div class="result-box">
+        <span class="label">Receiver Hash</span>
+        <code id="upload-receiver-hash">-</code>
+      </div>
+      <div class="result-box">
+        <span class="label">Digital Signature</span>
+        <code id="upload-signature-status">-</code>
+      </div>
+      <div class="result-box">
+        <span class="label">Explanation</span>
+        <p id="upload-summary">Upload a file to compare sender and receiver integrity.</p>
+      </div>
+      <div class="preview-box">
+        <h3>Sender Preview</h3>
+        <p><strong>Hex:</strong> <span id="upload-sender-preview-hex">-</span></p>
+        <p><strong>ASCII:</strong> <span id="upload-sender-preview-ascii">-</span></p>
+      </div>
+      <div class="preview-box">
+        <h3>Receiver Preview</h3>
+        <p><strong>Hex:</strong> <span id="upload-receiver-preview-hex">-</span></p>
+        <p><strong>ASCII:</strong> <span id="upload-receiver-preview-ascii">-</span></p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

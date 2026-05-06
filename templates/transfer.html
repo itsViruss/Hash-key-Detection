@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Secure Transfer | Hash Key Detection Simulator{% endblock %}
+{% block page_id %}transfer{% endblock %}
+
+{% block content %}
+  <section class="hero hero-compact">
+    <div>
+      <p class="eyebrow">Secure Transfer</p>
+      <h1>Simulate a Verified File Delivery</h1>
+      <p class="hero-text">
+        Send a file from sender to receiver with hashing, optional digital signature, and AES-style encryption simulation.
+      </p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <div class="card-heading">
+        <h2>Transfer Setup</h2>
+        <p>Only this real-mode transfer flow is written to the activity log.</p>
+      </div>
+
+      <form id="transfer-form" class="transfer-form" data-endpoint="/api/transfer-check">
+        <label class="field">
+          <span>Upload File</span>
+          <input name="file" type="file" required>
+        </label>
+
+        <label class="field">
+          <span>Hash Algorithm</span>
+          <select name="algorithm">
+            <option value="md5">MD5</option>
+            <option value="sha1">SHA-1</option>
+            <option value="sha256" selected>SHA-256</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Send To (Email)</span>
+          <input name="recipient_email" type="email" placeholder="user@example.com">
+        </label>
+
+        <label class="toggle">
+          <input id="transfer-signature-toggle" class="signature-toggle" name="enable_signature" type="checkbox" value="true">
+          <span>Enable Digital Signature</span>
+        </label>
+
+        <label class="toggle">
+          <input id="transfer-encryption-toggle" name="encrypt_file" type="checkbox" value="true">
+          <span>Encrypt File (AES simulation)</span>
+        </label>
+
+        <button id="transfer-submit" class="primary-btn" type="submit">Start Secure Transfer</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <div class="card-heading">
+        <h2>Transfer Animation</h2>
+        <p>Watch the file move across the secure channel while the page updates sending, delivery, and verification states.</p>
+      </div>
+
+      <div class="transfer-lab">
+        <div class="transfer-track">
+          <div class="transfer-station">
+            <strong>Sender</strong>
+            <span>Hashing</span>
+          </div>
+          <div class="transfer-progress-shell">
+            <div id="transfer-progress-bar" class="transfer-progress-bar"></div>
+            <div id="transfer-packet" class="transfer-packet" aria-hidden="true">📄</div>
+          </div>
+          <div class="transfer-station">
+            <strong>Receiver</strong>
+            <span>Verification</span>
+          </div>
+        </div>
+
+        <div class="status-stack compact-stack">
+          <div id="transfer-state-sending" class="guide-card neutral-card active-state">
+            <strong>Sending...</strong>
+            <p>Preparing the file and moving it across the secure channel.</p>
+          </div>
+          <div id="transfer-state-delivered" class="guide-card neutral-card">
+            <strong>Delivered</strong>
+            <p>The receiver has the file and is ready to calculate the receiver hash.</p>
+          </div>
+          <div id="transfer-state-verified" class="guide-card neutral-card">
+            <strong>Verified</strong>
+            <p>The platform compares sender and receiver integrity information.</p>
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="card result-panel">
+    <div class="card-heading">
+      <h2>Transfer Results</h2>
+      <p>After delivery, share the hash with the receiver so they can independently confirm integrity.</p>
+    </div>
+
+    <div class="status-row">
+      <div id="transfer-status" class="status-pill neutral">Awaiting transfer</div>
+      <span class="result-meta" id="transfer-algorithm">Algorithm: -</span>
+    </div>
+
+    <div class="result-grid">
+      <div class="result-box hash-box">
+        <span class="label">Sender Hash</span>
+        <code id="transfer-sender-hash">-</code>
+      </div>
+      <div class="result-box hash-box">
+        <span class="label">Receiver Hash</span>
+        <code id="transfer-receiver-hash">-</code>
+      </div>
+      <div class="result-box">
+        <span class="label">Signature Result</span>
+        <p id="transfer-signature-status">-</p>
+      </div>
+      <div class="result-box">
+        <span class="label">Encryption</span>
+        <p id="transfer-encryption-summary">-</p>
+      </div>
+      <div class="result-box">
+        <span class="label">Delivery Output</span>
+        <p id="transfer-delivery-message">-</p>
+      </div>
+      <div class="result-box">
+        <span class="label">Share Guidance</span>
+        <p id="transfer-share-message">Share this hash with receiver to verify file integrity.</p>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <a id="download-file-button" class="secondary-btn disabled-link" href="#" aria-disabled="true">Download File</a>
+      <button id="copy-transfer-hash-button" class="secondary-btn" type="button">Copy Hash</button>
+    </div>
+  </section>
+{% endblock %}

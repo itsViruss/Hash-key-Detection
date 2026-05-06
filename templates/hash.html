@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Hash Tool | Hash Key Detection Simulator{% endblock %}
+{% block page_id %}hash{% endblock %}
+
+{% block content %}
+  <section class="hero hero-compact">
+    <div>
+      <p class="eyebrow">Hash Tool</p>
+      <h1>Generate and Compare File Fingerprints</h1>
+      <p class="hero-text">
+        Upload a file, choose a hashing algorithm, and instantly generate a digest you can share for integrity checking.
+      </p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <div class="card-heading">
+        <h2>Hash Generator</h2>
+        <p>Use MD5, SHA-1, or SHA-256 and see the algorithm strength indicator immediately.</p>
+      </div>
+
+      <form id="hash-form" class="transfer-form" data-endpoint="/api/hash-tool">
+        <label class="field">
+          <span>Upload File</span>
+          <input name="file" type="file" required>
+        </label>
+
+        <label class="field">
+          <span>Hash Algorithm</span>
+          <select name="algorithm" id="hash-algorithm-select">
+            <option value="md5">MD5</option>
+            <option value="sha1">SHA-1</option>
+            <option value="sha256" selected>SHA-256</option>
+          </select>
+        </label>
+
+        <button class="primary-btn" type="submit">Generate Hash</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <div class="card-heading">
+        <h2>Security Guide</h2>
+        <p>Hash algorithms differ in collision resistance and modern security suitability.</p>
+      </div>
+
+      <div class="status-stack">
+        <div class="guide-card weak">
+          <strong>MD5</strong>
+          <p>Weak. Suitable only for legacy demonstrations, not for secure integrity guarantees.</p>
+        </div>
+        <div class="guide-card deprecated">
+          <strong>SHA-1</strong>
+          <p>Deprecated. Stronger than MD5, but no longer recommended for security-sensitive integrity checks.</p>
+        </div>
+        <div class="guide-card secure">
+          <strong>SHA-256</strong>
+          <p>Secure. Preferred for modern file-integrity workflows and educational best-practice examples.</p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="card result-panel">
+    <div class="card-heading">
+      <h2>Hash Result</h2>
+      <p>The digest below can be copied and shared with a receiver for verification.</p>
+    </div>
+
+    <div class="status-row">
+      <div id="hash-status" class="status-pill neutral">Awaiting file</div>
+      <span class="result-meta" id="hash-file-size">File size: -</span>
+    </div>
+
+    <div class="result-grid">
+      <div class="result-box hash-box wide-box">
+        <span class="label">Hash Value</span>
+        <code id="hash-value">-</code>
+      </div>
+      <div class="result-box">
+        <span class="label">Algorithm</span>
+        <p id="hash-algorithm-label">-</p>
+      </div>
+      <div class="result-box">
+        <span class="label">Security Indicator</span>
+        <p id="hash-security-indicator">-</p>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button id="copy-hash-button" class="secondary-btn" type="button">Copy Hash</button>
+    </div>
+  </section>
+{% endblock %}

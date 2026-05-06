@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Logs | Hash Key Detection Simulator{% endblock %}
+{% block page_id %}logs{% endblock %}
+
+{% block content %}
+  <section class="hero hero-compact">
+    <div>
+      <p class="eyebrow">Recorded Activity</p>
+      <h1>Secure Transfer Logs</h1>
+      <p class="hero-text">
+        This table lists only real-mode Secure Transfer activity. Hash Tool and Simulation Lab activity are intentionally excluded.
+      </p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-heading">
+      <h2>Activity Logs</h2>
+      <p>Each entry includes the filename, selected algorithm, timestamp, and integrity result from Secure Transfer.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Algorithm</th>
+            <th>Timestamp</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody id="logs-table">
+          <tr>
+            <td colspan="4">No upload logs yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
